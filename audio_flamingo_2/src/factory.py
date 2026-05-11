@@ -66,7 +66,7 @@ class CLAP(nn.Module):
         self.clap_config = clap_config
 
         self.method = clap_config["method"]
-        device_id = f'cuda:{torch.cuda.current_device()}'
+        device_id = f'cuda:{torch.cuda.current_device()}' if torch.cuda.is_available() else 'cpu'
 
         if ('finetune' in clap_config) and clap_config['finetune']:
             self.finetune = True 

@@ -157,7 +157,7 @@ def main():
         )
         if args.rank == 0:
             print(f"Loading checkpoint from {pretrained_path}")
-        checkpoint = torch.load(pretrained_path, map_location="cpu")
+        checkpoint = torch.load(pretrained_path, map_location="cpu", weights_only=False)
         msd = checkpoint["model_state_dict"]
         msd = {k.replace("module.", ""): v for k, v in msd.items()}
 
@@ -172,7 +172,7 @@ def main():
         # continue training (either pretraining or STF)
         if args.rank == 0:
             print(f"Loading checkpoint from {resume_from_checkpoint}")
-        checkpoint = torch.load(resume_from_checkpoint, map_location="cpu")
+        checkpoint = torch.load(resume_from_checkpoint, map_location="cpu", weights_only=False)
         msd = checkpoint["model_state_dict"]
         msd = {k.replace("module.", ""): v for k, v in msd.items()}
         resume_from_epoch = checkpoint["epoch"] + 1
@@ -326,7 +326,8 @@ def main():
                 dir=exp_path,
                 config=config,
             )
-            print(f"wandb run: {wandb.run.name} ({wandb.run.url if wandb.run.mode == 'online' else wandb.run.mode})")
+            wb_mode = wandb_config.get('mode', 'online')
+            print(f"wandb run: {wandb.run.name} ({wandb.run.url if wb_mode == 'online' else wb_mode})")
     else:
         tb = None
 

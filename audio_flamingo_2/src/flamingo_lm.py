@@ -36,6 +36,10 @@ class FlamingoLayer(nn.Module):
             )
         self.decoder_layer._use_gradient_checkpointing = gradient_checkpointing
 
+    @property
+    def attention_type(self):
+        return self.decoder_layer.attention_type
+
     def is_conditioned(self) -> bool:
         """Check whether the layer is conditioned."""
         return (self.audio_x is not None) and (self.audio_x_mask is not None) and (self.media_locations is not None)

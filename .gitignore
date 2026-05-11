@@ -2,3 +2,26 @@ __pycache__/
 .DS_Store
 core.*
 .cache/
+
+# Local MCP server (dev-machine only, not part of AF2)
+.mcp.json
+mcp/
+
+# Python envs / build artifacts
+.venv/
+venv/
+*.egg-info/
+*.pyc
+*.pyo
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+
+# Experiment outputs (avoid pushing checkpoints/logs to the fork)
+*.pt
+*.ckpt
+checkpoint_*/
+tensorboard/
+wandb/

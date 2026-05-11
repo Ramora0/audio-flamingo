@@ -12,6 +12,7 @@ from copy import deepcopy
 
 from contextlib import suppress
 import torch
+import wandb
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import (
     FullStateDictConfig,
@@ -241,6 +242,8 @@ def train_one_epoch(
                 if ((num_steps + 1) % args.logging_steps == 0):
                     for key in log_dict:
                         tb.add_scalar("Train/{}".format(key), log_dict[key], global_step)
+                    if wandb.run is not None:
+                        wandb.log({f"train/{k}": v for k, v in log_dict.items()}, step=global_step)
 
                 step_time_m.reset()
                 data_time_m.reset()

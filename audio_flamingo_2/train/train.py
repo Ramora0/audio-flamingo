@@ -20,6 +20,7 @@ import time
 
 import numpy as np
 import torch
+import wandb
 from torch.utils.tensorboard import SummaryWriter
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
@@ -82,6 +83,8 @@ def main():
     else:
         sft_config = None
         unfreeze_full_lm = False
+
+    wandb_config = config.get('wandb_config', None)
 
     # get paths done 
     exp_path = os.path.join(args.expdir, args.run_name)
@@ -312,6 +315,18 @@ def main():
     if args.rank == 0:
         print(f"Total training steps: {total_training_steps}")
         tb = SummaryWriter(os.path.join(exp_path, 'tensorboard'))
+        if wandb_config is not None and wandb_config.get('enabled', True):
+            wandb.init(
+                project=wandb_config.get('project', 'audio-flamingo-2'),
+                entity=wandb_config.get('entity'),
+                group=wandb_config.get('group'),
+                tags=wandb_config.get('tags'),
+                mode=wandb_config.get('mode', 'online'),
+                name=args.run_name,
+                dir=exp_path,
+                config=config,
+            )
+            print(f"wandb run: {wandb.run.name} ({wandb.run.url if wandb.run.mode == 'online' else wandb.run.mode})")
     else:
         tb = None
 
@@ -386,8 +401,11 @@ def main():
                     )
 
                 if args.rank == 0:
+                    valid_step = (epoch+1)*len(trainloader)
                     for key in valid_losses:
-                        tb.add_scalar("Valid/{}".format(key), valid_losses[key], (epoch+1)*len(trainloader))
+                        tb.add_scalar("Valid/{}".format(key), valid_losses[key], valid_step)
+                    if wandb.run is not None:
+                        wandb.log({f"valid/{k}": v for k, v in valid_losses.items()}, step=valid_step)
             
             except Exception as error:
                 print("An exception occurred:", error)
@@ -398,6 +416,8 @@ def main():
     save_checkpoint(ddp_model, optimizer, lr_scheduler, epoch, args)
     if args.rank == 0:
         tb.close()
+        if wandb.run is not None:
+            wandb.finish()
 
 
 if __name__ == "__main__":

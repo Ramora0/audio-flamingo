@@ -50,6 +50,14 @@ clap_config:
   window_overlap: 0.0
   max_num_window: 3              # 30s cap, matches AF2 pretrain; 92.5% of SoundBible fits
 
+wandb_config:
+  enabled: true
+  project: audio-flamingo-2
+  entity: null                   # null = your default entity
+  group: null
+  tags: [smoke-test, soundbible, qwen-0.5b]
+  mode: online                   # online / offline / disabled
+
 model_config:
   cache_dir: /fs/scratch/PAS2836/lees_stuff/hf_cache/hub
 

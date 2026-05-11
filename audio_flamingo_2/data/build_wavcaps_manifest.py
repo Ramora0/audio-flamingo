@@ -14,6 +14,7 @@ import argparse
 import json
 import os
 import sys
+import zipfile
 from pathlib import Path
 
 CAPTIONING_PROMPT = "Caption the input audio."
@@ -35,10 +36,15 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--wavcaps-json", required=True,
                     help="Path to WavCaps caption JSON (e.g. sb_final.json, fsd_final.json)")
-    ap.add_argument("--audio-dir", required=True,
-                    help="Absolute path to the directory containing the audio files (used to verify existence)")
+    ap.add_argument("--audio-dir", default=None,
+                    help="Directory of audio files for existence check. Required unless --zip-archive given.")
+    ap.add_argument("--zip-archive", default=None,
+                    help="If set, look up audio members inside this zip instead of on disk. "
+                         "Value also emitted as manifest's zip_archive field (relative to DATA_ROOT).")
+    ap.add_argument("--zip-archive-path", default=None,
+                    help="Filesystem path to the zip (defaults to --zip-archive treated as absolute).")
     ap.add_argument("--split-path", required=True,
-                    help="Value for manifest's split_path field (relative to DATA_ROOT)")
+                    help="Value for manifest's split_path field. In zip mode this is the member dir prefix.")
     ap.add_argument("--flamingo-task", required=True,
                     help="Task name (e.g. WavCaps-SoundBible-AudioCaptioning)")
     ap.add_argument("--split", default="train")
@@ -53,9 +59,23 @@ def main():
     ap.add_argument("--prompt", default=CAPTIONING_PROMPT)
     args = ap.parse_args()
 
-    audio_dir = Path(args.audio_dir)
-    if not audio_dir.is_dir():
-        sys.exit(f"audio-dir not found: {audio_dir}")
+    if args.zip_archive:
+        zip_fs_path = args.zip_archive_path or args.zip_archive
+        if not Path(zip_fs_path).is_file():
+            sys.exit(f"zip not found: {zip_fs_path}")
+        print(f"reading zip member listing: {zip_fs_path}")
+        with zipfile.ZipFile(zip_fs_path) as zf:
+            zip_members = {n for n in zf.namelist() if n.endswith(args.ext)}
+        zip_basenames = {Path(n).name for n in zip_members}
+        print(f"zip: {len(zip_basenames)} {args.ext} members")
+        audio_dir = None
+    else:
+        if not args.audio_dir:
+            sys.exit("--audio-dir required when --zip-archive not given")
+        audio_dir = Path(args.audio_dir)
+        if not audio_dir.is_dir():
+            sys.exit(f"audio-dir not found: {audio_dir}")
+        zip_basenames = None
 
     with open(args.wavcaps_json) as f:
         src = json.load(f)
@@ -85,9 +105,14 @@ def main():
             n_too_long += 1
             continue
         fname = f"{sid}{args.ext}"
-        if not (audio_dir / fname).is_file():
-            n_missing += 1
-            continue
+        if zip_basenames is not None:
+            if fname not in zip_basenames:
+                n_missing += 1
+                continue
+        else:
+            if not (audio_dir / fname).is_file():
+                n_missing += 1
+                continue
         out_data[str(len(out_data))] = {
             "name": fname,
             "prompt": args.prompt,
@@ -102,6 +127,8 @@ def main():
         "total_num": len(out_data),
         "data": out_data,
     }
+    if args.zip_archive:
+        manifest["zip_archive"] = args.zip_archive
 
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)

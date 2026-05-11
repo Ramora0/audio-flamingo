@@ -32,7 +32,7 @@ data_config:
       weight: 1.0
 
   dataset_file_root: /fs/scratch/PAS2836/lees_stuff/wavcaps/manifests
-  data_root: /fs/scratch/PAS2836/lees_stuff/wavcaps/audio
+  data_root: /fs/scratch/PAS2836/lees_stuff/wavcaps    # parent of shards/ — manifest's zip_archive is resolved relative to this
   dataset_blending_output: dataset_blending.json
   max_tokens: 512
   num_workers: 4

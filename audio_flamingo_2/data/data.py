@@ -9,6 +9,7 @@ import io
 import json
 import math
 import os
+import zipfile
 os.environ["TOKENIZERS_PARALLELISM"] = "false"  # disable the tokenizer parallelism warning
 import random
 import re
@@ -201,12 +202,15 @@ class AudioTextData(torch.utils.data.Dataset):
             }}
         """
 
+        zip_archive = contents.get('zip_archive')
+
         if 'interleaved' not in dataset_file:
             for idx in contents["data"]:
                 contents["data"][idx]['task'] = contents["flamingo_task"]
-                contents["data"][idx]['name'] = os.path.join(
-                    abs_path, contents["data"][idx]['name']
-                )
+                joined = os.path.join(abs_path, contents["data"][idx]['name'])
+                if zip_archive:
+                    joined = "{}::{}".format(zip_archive, joined)
+                contents["data"][idx]['name'] = joined
             return contents
     
     def blend_dataset(self, dataset_blending_config, dataset_blending_output):
@@ -313,9 +317,25 @@ class AudioTextData(torch.utils.data.Dataset):
         
         return num_windows, full_length
 
+    def _read_zip_member(self, zip_path, member):
+        # zipfile.ZipFile is not fork-safe; lazy-init per DataLoader worker.
+        if not hasattr(self, '_zip_handles'):
+            self._zip_handles = {}
+        if zip_path not in self._zip_handles:
+            self._zip_handles[zip_path] = zipfile.ZipFile(zip_path, 'r')
+        return self._zip_handles[zip_path].read(member)
+
     def load_audio(self, file_path, target_sr=16000, duration=30.0, start=0.0):
-        if file_path.endswith('.mp3'):
-            audio = AudioSegment.from_file(file_path)
+        if '::' in file_path:
+            zip_path, member = file_path.split('::', 1)
+            audio_src = io.BytesIO(self._read_zip_member(zip_path, member))
+            ext_path = member
+        else:
+            audio_src = file_path
+            ext_path = file_path
+
+        if ext_path.endswith('.mp3'):
+            audio = AudioSegment.from_file(audio_src)
             if len(audio) > (start + duration) * 1000:
                 audio = audio[start * 1000:(start + duration) * 1000]
 
@@ -324,7 +344,7 @@ class AudioTextData(torch.utils.data.Dataset):
 
             if audio.channels > 1:
                 audio = audio.set_channels(1)
-            
+
             data = np.array(audio.get_array_of_samples())
             if audio.sample_width == 2:
                 data = data.astype(np.float32) / np.iinfo(np.int16).max
@@ -334,7 +354,7 @@ class AudioTextData(torch.utils.data.Dataset):
                 raise ValueError("Unsupported bit depth: {}".format(audio.sample_width))
 
         else:
-            with sf.SoundFile(file_path) as audio:
+            with sf.SoundFile(audio_src) as audio:
                 original_sr = audio.samplerate
                 channels = audio.channels
 

@@ -6,7 +6,7 @@
 
 # --- Paths (cluster-specific; edit if you move things) ---
 export AF2_SCRATCH=${AF2_SCRATCH:-/fs/scratch/PAS2836/lees_stuff}
-export AF2_VENV=${AF2_VENV:-$AF2_SCRATCH/envs/af2}
+export AF2_VENV="/users/PAS2836/leedavis/research/audio-flamingo/.a100"
 
 # --- Force every cache off HOME ---
 export HF_HOME="$AF2_SCRATCH/hf_cache"

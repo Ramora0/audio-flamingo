@@ -1,0 +1,66 @@
+train_config:
+  expdir: /fs/scratch/PAS2836/lees_stuff/runs
+  run_name: soundbible-smoke-0.5B
+  delete_previous_checkpoint: true
+  batch_size: 4
+  gradient_accumulation_steps: 1
+  seed: 42
+  learning_rate: 0.0001
+  lr_scheduler: constant
+  loss_multiplier: 1.0
+  warmup_steps: 50
+  weight_decay: 0.1
+  precision: amp_bf16
+  gradient_checkpointing: False
+  num_epochs: 1                  # single pass through SoundBible (1232 samples / bs=4 ≈ 308 steps)
+  offline: false
+  freeze_lm_embeddings: false
+  logging_steps: 10
+  dist_backend: nccl
+  dist_url: env://
+  no_set_device_rank: false
+  fsdp: false                    # single-GPU smoke; DDP wraps with world_size=1
+  fsdp_use_orig_params: false
+  fsdp_sharding_strategy: full
+  horovod: false
+
+data_config:
+  dataset_blending_global_weight: 1.0  # consume the full dataset per epoch (no subsampling)
+
+  dataset_blending_config:
+    WavCaps-SoundBible-AudioCaptioning/train:
+      weight: 1.0
+
+  dataset_file_root: /fs/scratch/PAS2836/lees_stuff/wavcaps/manifests
+  data_root: /fs/scratch/PAS2836/lees_stuff/wavcaps/audio
+  dataset_blending_output: dataset_blending.json
+  max_tokens: 512
+  num_workers: 4
+
+  valid_dataset_config:
+    # smoke test: reuse train manifest as eval — fine for verifying the pipeline
+    WavCaps-SoundBible-AudioCaptioning/train: true
+
+clap_config:
+  method: afclap-large
+  audio_embed_dim: 2048
+  checkpoint: /fs/scratch/PAS2836/lees_stuff/checkpoints/af2/clap_ckpt/epoch_16.pt
+
+  window_length: 10.0
+  window_overlap: 0.0
+  max_num_window: 3              # 30s cap, matches AF2 pretrain; 92.5% of SoundBible fits
+
+model_config:
+  cache_dir: /fs/scratch/PAS2836/lees_stuff/hf_cache/hub
+
+  lang_encoder_path: Qwen/Qwen2.5-0.5B
+  tokenizer_path: Qwen/Qwen2.5-0.5B
+  cross_attn_every_n_layers: 1
+  audio_transformer_kwargs: {
+    n_head: 8,
+    n_layers: 3,
+    d_inner: 2048,
+    max_num_media: 128,
+    max_window_per_audio: 1,
+    common_encoder_embed_dim: 1024  # overridden to clap_embed_dim in Flamingo.__init__
+  }
